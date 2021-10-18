@@ -71,14 +71,16 @@ export default async function handler(req: any, res: any) {
         } else {
           switch (slug[1]) {
             case "config":
-              res
-                .status(200)
-                .json({ status: "success", config: storedData.get("config") })
+              res.status(200).json({
+                status: "success",
+                data: { config: storedData.get("config") },
+              })
               break
             case "records":
-              res
-                .status(200)
-                .json({ status: "success", records: storedData.get("records") })
+              res.status(200).json({
+                status: "success",
+                data: { records: storedData.get("records") },
+              })
               break
             default:
               res.status(405).end() //Method Not Allowed

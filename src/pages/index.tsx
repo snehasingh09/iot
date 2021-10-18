@@ -1,5 +1,9 @@
 import * as React from "react"
 
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
+import Accordion from "@mui/material/Accordion"
+import AccordionDetails from "@mui/material/AccordionDetails"
+import AccordionSummary from "@mui/material/AccordionSummary"
 import Box from "@mui/material/Box"
 import Button from "@mui/material/Button"
 import Container from "@mui/material/Container"
@@ -11,6 +15,7 @@ import consola from "consola"
 import fetch from "isomorphic-unfetch"
 
 import Copyright from "@components/Copyright"
+import PrettyPrintJSON from "@components/PrettyPrintJSON"
 import useBoolean from "@hooks/useBoolean"
 
 export default function Index() {
@@ -88,7 +93,7 @@ export default function Index() {
           <TextField
             label="Get URL"
             id="outlined-start-adornment"
-            sx={{ m: 1, width: "100%" }}
+            sx={{ width: "100%", my: 1 }}
             value={urlGet}
             onChange={(event) => setURLGet(event.target.value)}
             InputProps={{
@@ -97,12 +102,20 @@ export default function Index() {
               ),
             }}
           />
-          <Typography variant="body1" component="h2" gutterBottom>
-            Get Response
-          </Typography>
-          <Typography variant="body2" component="h3" gutterBottom>
-            {`${JSON.stringify(responseGet)}`}
-          </Typography>
+          <Accordion sx={{ my: 1 }}>
+            <AccordionSummary
+              expandIcon={<ExpandMoreIcon />}
+              aria-controls="panel1a-content"
+              id="panel1a-header"
+            >
+              <Typography variant="body1" component="h2" gutterBottom>
+                Get Response
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <PrettyPrintJSON ob={responseGet} />
+            </AccordionDetails>
+          </Accordion>
           <Button onClick={() => handleGetClick()} disabled={fetching}>
             Get
           </Button>
@@ -121,7 +134,7 @@ export default function Index() {
           <TextField
             label="Post URL"
             id="outlined-start-adornment"
-            sx={{ mb: 1, width: "100%" }}
+            sx={{ my: 1, width: "100%" }}
             value={urlPost}
             onChange={(event) => setURLPost(event.target.value)}
             InputProps={{
@@ -144,15 +157,27 @@ export default function Index() {
           <Typography variant="body1" component="h2" gutterBottom>
             Data to be posted
           </Typography>
-          <Typography variant="body2" component="h3" gutterBottom>
-            {validJSON ? `${JSON.stringify(postData)}` : "JSON not valid"}
-          </Typography>
-          <Typography variant="body1" component="h2" gutterBottom>
-            Post Response
-          </Typography>
-          <Typography variant="body2" component="h3" gutterBottom>
-            {`${JSON.stringify(responsePost)}`}
-          </Typography>
+          {!validJSON ? (
+            <Typography variant="body2" component="h3" gutterBottom>
+              {"JSON not valid"}
+            </Typography>
+          ) : (
+            <PrettyPrintJSON ob={postData} />
+          )}
+          <Accordion sx={{ my: 1 }}>
+            <AccordionSummary
+              expandIcon={<ExpandMoreIcon />}
+              aria-controls="panel1a-content"
+              id="panel1a-header"
+            >
+              <Typography variant="body1" component="h2" gutterBottom>
+                Post Response
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <PrettyPrintJSON ob={responsePost} />
+            </AccordionDetails>
+          </Accordion>
           <Button
             onClick={() => handlePostClick()}
             disabled={fetching || !validJSON}

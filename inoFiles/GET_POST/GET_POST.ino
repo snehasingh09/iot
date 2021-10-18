@@ -39,7 +39,8 @@ void setup()
   }
 
   WiFi.mode(WIFI_STA);
-  WiFiMulti.addAP("BinodAirtel", "mathfact970");
+  // Please update your SSID and password
+  WiFiMulti.addAP("***SSID***", "***PASSWORD***");
 }
 
 String openChannel(bool get, String message)
