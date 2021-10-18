@@ -12,12 +12,24 @@
 
 #include <ESP8266HTTPClient.h>
 
-#include <WiFiClientSecureBearSSL.h>
-// Fingerprint for URL, expires, needs to be updated before installing
-const char fingerprint[] PROGMEM = "E5 49 97 52 0C EB 31 2E 0E 85 5E 8B D6 F0 F8 5C C1 2D BB 6B";
-const char *configURL = "https://iot-azure.vercel.app/api/store/1/config";
-const char *recordURL = "https://iot-azure.vercel.app/api/store/1/record";
-const bool useSecure = true;
+#include <ArduinoJson.h>
+
+//#include <WiFiClientSecureBearSSL.h>
+
+//***************************************************
+// Can be updated via server through get config call
+unsigned long loopDelay = 10000;
+bool useThreshold = false;
+double threshold = 0.0;
+//***************************************************
+
+//***************************************************
+// Update with your WIFI settings
+const char *ssid = "BinodAirtel";
+const char *passwd = "mathfact970";
+//***************************************************
+
+//===================== Wifi Setup Begin =====================
 
 ESP8266WiFiMulti WiFiMulti;
 
@@ -39,11 +51,28 @@ void setup()
   }
 
   WiFi.mode(WIFI_STA);
-  // Please update your SSID and password
-  WiFiMulti.addAP("***SSID***", "***PASSWORD***");
+  WiFiMulti.addAP(ssid, passwd);
 }
 
-String openChannel(bool get, String message)
+//===================== Wifi Setup Ends =====================
+
+//================ Start Communication Begin =================
+
+//***************************************************
+// Set your scope for server
+const String scope = "1";
+//***************************************************
+
+// Do not change anything below
+// Fingerprint for URL, expires, needs to be updated before installing
+const char fingerprint[] PROGMEM = "E5 49 97 52 0C EB 31 2E 0E 85 5E 8B D6 F0 F8 5C C1 2D BB 6B";
+#define URLMAXLEN 200
+const String configURL = "https://iot-azure.vercel.app/api/store/" + scope + "/config";
+const String recordURL = "https://iot-azure.vercel.app/api/store/" + scope + "/record";
+// Set this false if using http instead of https, change https to http in urls. Current server only supports HTTPS
+const bool useSecure = true;
+
+String openChannel(bool getX, String message)
 {
   // wait for WiFi connection
   String payload;
@@ -65,19 +94,21 @@ String openChannel(bool get, String message)
     HTTPClient https;
 
     Serial.print("[HTTPS] begin...\n");
-    const char *url;
-    if (get)
+    char url[URLMAXLEN];
+    if (getX)
     {
-      url = configURL;
+      configURL.toCharArray(url, URLMAXLEN);
     }
     else
     {
-      url = recordURL;
+      recordURL.toCharArray(url, URLMAXLEN);
     }
+    Serial.print("[HTTPS] url...\n");
+    Serial.println(url);
     if (https.begin(*client, url))
     { // HTTPS
       int httpCode;
-      if (get)
+      if (getX)
       {
         Serial.print("[HTTPS] GET...\n");
         // start connection and send HTTP header
@@ -94,7 +125,7 @@ String openChannel(bool get, String message)
       if (httpCode > 0)
       {
         // HTTP header has been send and Server response header has been handled
-        if (get)
+        if (getX)
         {
           Serial.printf("[HTTPS] GET... code: %d\n", httpCode);
         }
@@ -107,7 +138,6 @@ String openChannel(bool get, String message)
         if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
         {
           payload = https.getString();
-          //          Serial.println(payload);
         }
       }
       else
@@ -125,15 +155,126 @@ String openChannel(bool get, String message)
   return payload;
 }
 
-bool current = false;
-int loopCount = 0;
+//================ Start Communication Ends =================
+
+//================ JSON Parsing Begin =================
+//***************************************************
+// https://arduinojson.org/v6/example/parser/
+// Set max length of JSON you will receive in get config
+#define JSONSIZE 300
+// I am assuming my JSON to be {"status":"success","data":{"config":{"probePeriod": <some number uint>, "useThreshold": <0/1 int>, "threshold": <some_number, floating>}}}
+//***************************************************
+
+void parseJSON(String message)
+{
+  StaticJsonDocument<JSONSIZE> doc;
+
+  // StaticJsonDocument<N> allocates memory on the stack, it can be
+  // replaced by DynamicJsonDocument which allocates in the heap.
+  //
+  // DynamicJsonDocument doc(JSONSIZE);
+
+  // JSON input string.
+  //
+  // Using a char[], as shown here, enables the "zero-copy" mode. This mode uses
+  // the minimal amount of memory because the JsonDocument stores pointers to
+  // the input buffer.
+  // If you use another type of input, ArduinoJson must copy the strings from
+  // the input to the JsonDocument, so you need to increase the capacity of the
+  // JsonDocument.
+  char json[JSONSIZE];
+  message.toCharArray(json, JSONSIZE);
+
+  // Deserialize the JSON document
+  DeserializationError error = deserializeJson(doc, json);
+
+  // Test if parsing succeeds.
+  if (error)
+  {
+    Serial.print(F("deserializeJson() failed: "));
+    Serial.println(error.f_str());
+    return;
+  }
+
+  // Fetch values.
+  //
+  // Most of the time, you can rely on the implicit casts.
+  // In other case, you can do doc["time"].as<long>();
+  const char *status = doc["status"];
+  loopDelay = doc["data"]["config"]["probePeriod"];
+  int val = doc["data"]["config"]["useThreshold"];
+  if (val == 0)
+  {
+    useThreshold = false;
+  }
+  else
+  {
+    useThreshold = true;
+  }
+  threshold = doc["data"]["config"]["threshold"];
+
+  if (loopDelay <= 0)
+  {
+    loopDelay = 10000;
+  }
+
+  // // Print values.
+  Serial.println(status);
+  Serial.println(loopDelay);
+  Serial.println(useThreshold);
+  Serial.println(val);
+  Serial.println(threshold, 6);
+}
+//================ JSON Parsing Ends =================
+
+bool getX = false;
+unsigned long loopCount = 0;
+double value = 0;
+double stepV = 0.5;
 
 void loop()
 {
+  unsigned long start = millis();
   loopCount += 1;
-  String message = "{\"loopCount\": " + String(loopCount) + "}";
-  String payload = openChannel(current, message);
+  value += stepV;
+  String message = "{\"loopCount\": " + String(loopCount) + ", \"value\": " + String(value, 6) + "}";
+  String payload = openChannel(getX, message);
   Serial.println(payload);
-  current = !current;
-  delay(15000);
+  getX = !getX;
+  payload = openChannel(getX, message);
+  Serial.println(payload);
+  parseJSON(payload);
+  getX = !getX;
+  Serial.println(value);
+  Serial.println(stepV);
+  if (threshold > 0)
+  {
+    Serial.println("Testing threshold");
+    if (value > threshold)
+    {
+      Serial.println("v>t");
+      Serial.println(stepV);
+      stepV = stepV > 0 ? -stepV : stepV;
+      Serial.println(stepV);
+    }
+    if (value < (-threshold))
+    {
+      Serial.println("v<-t");
+      Serial.println(stepV);
+      stepV = stepV < 0 ? -stepV : stepV;
+      Serial.println(stepV);
+    }
+    Serial.println("Testing threshold Completed");
+  }
+  if (loopDelay > 0)
+  {
+    unsigned long nap = loopDelay - (millis() - start);
+    Serial.print("Napping ...");
+    Serial.println(nap);
+    nap = loopDelay < nap ? loopDelay : nap;
+    if (nap > 0)
+    {
+      delay(nap);
+    }
+  }
 }

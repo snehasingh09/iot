@@ -5,31 +5,68 @@ import Accordion from "@mui/material/Accordion"
 import AccordionDetails from "@mui/material/AccordionDetails"
 import AccordionSummary from "@mui/material/AccordionSummary"
 import Box from "@mui/material/Box"
+import Button from "@mui/material/Button"
 import Container from "@mui/material/Container"
 import FormControl from "@mui/material/FormControl"
 import FormHelperText from "@mui/material/FormHelperText"
 import InputLabel from "@mui/material/InputLabel"
 import MenuItem from "@mui/material/MenuItem"
 import Select from "@mui/material/Select"
+import Stack from "@mui/material/Stack"
+import TextField from "@mui/material/TextField"
 import Typography from "@mui/material/Typography"
-import { useRouter } from "next/router"
+import consola from "consola"
 import { Bar } from "react-chartjs-2"
 
-import Copyright from "@components/Copyright"
 import PrettyPrintJSON from "@components/PrettyPrintJSON"
+import useBoolean from "@hooks/useBoolean"
 import useScope from "@hooks/useScope"
 
 export default function ValuedScope(props: any) {
-  const router = useRouter()
   const { scope } = props
   const query = useScope(scope, {})
   const [dataFields, setDataFields] = React.useState<string[]>([])
-  const [selectedField, setSelectedField] = React.useState<string>("")
+  const [selectedFieldX, setSelectedFieldX] = React.useState<string>("")
   const [chartData, setChartData] = React.useState<any | null>({})
-  React.useEffect(() => {
-    if (!query.data) {
-      router.push("/scope")
+  const { value: fetching, setValue: setFetching } = useBoolean(false)
+  const [postData, setPostData] = React.useState<any>({})
+  const { value: validJSON, setValue: setValidJSON } = useBoolean(true)
+  const [responsePost, setResponsePost] = React.useState<
+    any | null | undefined
+  >({})
+  const jsonParse = (s: string) => {
+    try {
+      let k = JSON.parse(s)
+      setPostData(k)
+      setValidJSON(true)
+    } catch (e) {
+      setValidJSON(false)
+      setPostData({})
+    }
+  }
+  const handlePostConfigClick = async () => {
+    if (!fetching) {
+      setFetching(true)
+      consola.debug("POST Triggered")
+      const requestOptions = {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(postData),
+      }
+      const data = await fetch(
+        `api/store/${scope}/config`,
+        requestOptions
+      ).then(async (response) => await response.json())
+      setResponsePost(data)
+      setFetching(false)
     } else {
+      consola.debug("fetch in progress")
+    }
+  }
+  React.useEffect(() => {
+    if (query.data) {
       let fields = [...dataFields]
       let touched = false
       for (const record of query.data.data.records) {
@@ -44,38 +81,35 @@ export default function ValuedScope(props: any) {
         }
       }
     }
-  }, [query, dataFields, router])
+  }, [query, dataFields])
   const handleChange = (event: any) => {
-    setSelectedField(event.target.value)
+    setSelectedFieldX(event.target.value)
   }
   React.useEffect(() => {
-    if (dataFields.includes(selectedField)) {
+    if (dataFields.includes(selectedFieldX)) {
       let cData = {
         labels: query.data.data.records.map((e: any) => e.time),
         datasets: [
           {
             type: "line",
-            label: selectedField.toUpperCase(),
+            label: selectedFieldX.toUpperCase(),
             borderColor: "rgb(54, 162, 235)",
             borderWidth: 2,
             fill: false,
             data: query.data.data.records.map(
-              (e: any) => e.data[selectedField]
+              (e: any) => e.data[selectedFieldX]
             ),
           },
         ],
       }
       setChartData(cData)
     }
-  }, [selectedField, dataFields, query])
+  }, [selectedFieldX, dataFields, query])
   return (
     <Container maxWidth="sm">
       <Box sx={{ my: 4 }}>
-        <Typography variant="h2" component="h1" gutterBottom>
-          IOT Server v1
-        </Typography>
         <Typography variant="h4" component="h2" gutterBottom>
-          Scope {scope}
+          Detail for Scope: {scope}
         </Typography>
         {query.data ? (
           <React.Fragment>
@@ -90,7 +124,57 @@ export default function ValuedScope(props: any) {
                 </Typography>
               </AccordionSummary>
               <AccordionDetails>
-                <PrettyPrintJSON ob={query.data.data.config} />
+                <Stack
+                  direction="column"
+                  sx={{
+                    mx: 1,
+                    p: 2,
+                    border: "solid",
+                  }}
+                >
+                  <PrettyPrintJSON ob={query.data.data.config} />
+                  <TextField
+                    id="outlined-multiline-flexible"
+                    label="POST JSON"
+                    multiline
+                    minRows={4}
+                    error={!validJSON}
+                    onChange={(e) => {
+                      consola.debug(e.target.value)
+                      jsonParse(e.target.value)
+                    }}
+                  />
+                  <Typography variant="body1" component="h2" gutterBottom>
+                    Config to be posted
+                  </Typography>
+                  {!validJSON ? (
+                    <Typography variant="body2" component="h3" gutterBottom>
+                      {"JSON not valid"}
+                    </Typography>
+                  ) : (
+                    <PrettyPrintJSON ob={postData} />
+                  )}
+                  <Accordion sx={{ my: 1 }}>
+                    <AccordionSummary
+                      expandIcon={<ExpandMoreIcon />}
+                      aria-controls="panel1a-content"
+                      id="panel1a-header"
+                    >
+                      <Typography variant="body1" component="h2" gutterBottom>
+                        Post Response
+                      </Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                      <PrettyPrintJSON ob={responsePost} />
+                    </AccordionDetails>
+                  </Accordion>
+                  <Button
+                    onClick={() => handlePostConfigClick()}
+                    disabled={fetching || !validJSON}
+                  >
+                    UPDATE CONFIG
+                  </Button>
+                </Stack>
               </AccordionDetails>
             </Accordion>
             <Accordion sx={{ my: 1 }}>
@@ -111,11 +195,11 @@ export default function ValuedScope(props: any) {
               Fields
             </Typography>
             <FormControl
-              sx={{ m: 1, minWidth: 120 }}
-              error={!dataFields.includes(selectedField)}
+              sx={{ m: 1, width: "100%" }}
+              error={!dataFields.includes(selectedFieldX)}
             >
               <InputLabel id="demo-simple-select-error-label">
-                Fields
+                X-Axis
               </InputLabel>
               <Select
                 labelId="demo-simple-select-error-label"
@@ -123,8 +207,8 @@ export default function ValuedScope(props: any) {
                 sx={{
                   width: "100%",
                 }}
-                value={selectedField}
-                label="Fields"
+                value={selectedFieldX}
+                label="X-Axis"
                 onChange={handleChange}
                 renderValue={(value) => `${value}`}
               >
@@ -139,81 +223,20 @@ export default function ValuedScope(props: any) {
                 {/* <MenuItem value={20}>Twenty</MenuItem>
               <MenuItem value={30}>Thirty</MenuItem> */}
               </Select>
-              {dataFields.includes(selectedField) ? (
+              {dataFields.includes(selectedFieldX) ? (
                 <FormHelperText>
-                  {selectedField} is selected for Y Axis
+                  {selectedFieldX} is selected for Y Axis
                 </FormHelperText>
               ) : (
                 <FormHelperText>Please pick a field for Y Axis</FormHelperText>
               )}
             </FormControl>
-            {dataFields.includes(selectedField) ? (
+            {dataFields.includes(selectedFieldX) ? (
               <Bar data={chartData} />
             ) : null}
           </React.Fragment>
         ) : null}
-        {/* <Typography variant="body1" component="p" gutterBottom>
-          {"/api/<scope_name_or_identifier>/[|config|records]"}
-        </Typography>
-        <Typography variant="body2" component="p" gutterBottom>
-          {
-            "<scope_name_or_identifier> is used to uniquely identify each of our projects. It can be a name or number. To avoid overlap, please announce in the group once you have decided on the same"
-          }
-        </Typography>
-        <Typography variant="body2" component="p" gutterBottom>
-          {
-            "[|config|records] if specified it will fetch data for config or records, else it will get both the values"
-          }
-        </Typography>
-        <Typography variant="body2" component="p" gutterBottom>
-          {"Examples:"}
-        </Typography>
-        <Typography variant="body2" component="p" gutterBottom>
-          {"/api/1          gets {config: {...}, records: [...]} for scope 1"}
-        </Typography>
-        <Typography variant="body2" component="p" gutterBottom>
-          {"/api/1/config   gets {config: {...}} for scope 1"}
-        </Typography>
-        <Typography variant="body2" component="p" gutterBottom>
-          {"/api/1/records  gets {records: [...]} for scope 1"}
-        </Typography>
-        <Typography variant="h4" component="h2" gutterBottom>
-          Post
-        </Typography>
-        <Typography variant="h6" component="h3" gutterBottom>
-          Usage
-        </Typography>
-        <Typography variant="body1" component="p" gutterBottom>
-          {"/api/<scope_name_or_identifier>/[reset|config|records]"}
-        </Typography>
-        <Typography variant="body2" component="p" gutterBottom>
-          {
-            "<scope_name_or_identifier> is used to uniquely identify each of our projects. It can be a name or number. To avoid overlap, please announce in the group once you have decided on the same"
-          }
-        </Typography>
-        <Typography variant="body2" component="p" gutterBottom>
-          {
-            "[reset|config|records] specified action will be done using json data provided. 'reset' will erase record of specified scope. 'config' will create scope if not present and replace config with provided json. 'record' will create scope if not present and add json to the end of the records array along with server time as time field."
-          }
-        </Typography>
-        <Typography variant="body2" component="p" gutterBottom>
-          {"Examples:"}
-        </Typography>
-        <Typography variant="body2" component="p" gutterBottom>
-          {"/api/1/reset    deletes scope 1"}
-        </Typography>
-        <Typography variant="body2" component="p" gutterBottom>
-          {
-            "/api/1/config   sets {config: {...}} for scope 1 using json provided"
-          }
-        </Typography>
-        <Typography variant="body2" component="p" gutterBottom>
-          {
-            "/api/1/record   sets {records: [..., {data:<json_data>, time:<server_ts>}]} for scope 1"
-          }
-        </Typography> */}
       </Box>
-      <Copyright />
     </Container>
   )
 }

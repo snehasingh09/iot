@@ -19,7 +19,8 @@
     "react": "17.0.2",
     "react-chartjs-2": "^3.1.0",
     "react-dom": "17.0.2",
-    "react-query": "^3.27.0"
+    "react-query": "^3.27.0",
+    "react-tiny-fab": "^4.0.3"
   },
   "scripts": {
     "dev": "next",

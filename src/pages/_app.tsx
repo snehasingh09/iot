@@ -8,6 +8,7 @@ import Head from "next/head"
 import { QueryClient, QueryClientProvider } from "react-query"
 
 import createEmotionCache from "@components/createEmotionCache"
+import FAB from "@components/FAB"
 import theme from "@components/theme"
 
 // Client-side cache, shared for the whole session of the user in the browser.
@@ -40,6 +41,7 @@ export default function MyApp(props: MyAppProps) {
           {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
           <CssBaseline />
           <Component {...pageProps} />
+          <FAB />
         </ThemeProvider>
       </CacheProvider>
     </QueryClientProvider>
