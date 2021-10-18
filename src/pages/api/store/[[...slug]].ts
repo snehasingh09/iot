@@ -17,17 +17,17 @@ const createRecord = (record: any) => {
 }
 
 const slugValidator = (slug: string[] | undefined, method: string) => {
-  if (!slug) {
-    return false
-  }
-  if (1 <= slug.length && slug.length <= 2) {
+  if (!slug || slug.length <= 2) {
     switch (method) {
       case "POST":
         return (
-          slug.length === 2 && ["config", "record", "reset"].includes(slug[1])
+          slug &&
+          slug.length === 2 &&
+          ["config", "record", "reset"].includes(slug[1])
         )
       case "GET":
         return (
+          !slug ||
           slug.length === 1 ||
           (slug.length === 2 && ["config", "records"].includes(slug[1]))
         )
@@ -46,11 +46,21 @@ export default async function handler(req: any, res: any) {
     })
     return
   }
-  let storedData = cache.get(slug[0])
+  let storedData
+  if (slug && slug.length) {
+    storedData = cache.get(slug[0])
+  }
   consola.debug("storedData", storedData)
   switch (req.method) {
     case "GET":
-      if (!storedData) {
+      if (!slug) {
+        res.status(200).json({
+          status: "success",
+          data: {
+            scopes: cache.keys(),
+          },
+        })
+      } else if (!storedData) {
         res.status(400).json({
           status: "failed",
           message: `${slug[0]} doesn't have any data in cache`,

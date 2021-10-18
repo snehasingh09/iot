@@ -19,9 +19,9 @@ import Copyright from "@components/Copyright"
 import PrettyPrintJSON from "@components/PrettyPrintJSON"
 import useScope from "@hooks/useScope"
 
-export default function About() {
+export default function ValuedScope(props: any) {
   const router = useRouter()
-  const scope = router.asPath.split("/").slice(-1)[0]
+  const { scope } = props
   const query = useScope(scope, {})
   const [dataFields, setDataFields] = React.useState<string[]>([])
   const [selectedField, setSelectedField] = React.useState<string>("")
